@@ -82,6 +82,7 @@ class AbstractLinkable(object):
         '_links',
         '_notifier',
         '_notify_all',
+        '_enable_hub_bug',
         '__weakref__'
     )
 
@@ -116,6 +117,7 @@ class AbstractLinkable(object):
         # cython. If it's true, when notifiers fire, all existing callbacks are called.
         # If its false, we only call callbacks as long as ready() returns true.
         self._notify_all = True
+        self._enable_hub_bug = False
         # we don't want to do get_hub() here to allow defining module-level objects
         # without initializing the hub. However, for multiple-thread safety, as soon
         # as a waiting method is entered, even if it won't have to wait, we
@@ -133,6 +135,12 @@ class AbstractLinkable(object):
     def ready(self):
         # Instances must define this
         raise NotImplementedError
+
+    def enable_hub_bug(self):
+        self._enable_hub_bug = True
+
+    def disable_hub_bug(self):
+        self._enable_hub_bug = False
 
     def rawlink(self, callback):
         """
@@ -187,6 +195,8 @@ class AbstractLinkable(object):
             if my_hub.dead: # dead is a property, could release GIL
                 # back, holding GIL
                 if self.hub is my_hub:
+                    print('AbstractLinkable._capture_hub: my hub is dead',
+                          file=sys.stderr)
                     self.hub = None
                     my_hub = None
                     break
@@ -433,13 +443,23 @@ class AbstractLinkable(object):
 
     def __wait_to_be_notified(self, rawlink): # pylint:disable=too-many-branches
         resume_this_greenlet = getcurrent().switch # pylint:disable=undefined-variable
+        hub_before_rawlink = self.hub
+
         if rawlink:
             self.rawlink(resume_this_greenlet)
         else:
             self._notifier.args[0].append(resume_this_greenlet)
 
+        if hub_before_rawlink is not None and self.hub is None:
+            print('AbstractLinkable.__wait_to_be_notified: '
+                  'hub disappeared after self.rawlink() call',
+                  file=sys.stderr)
+
+        # Don't hold on to a needless reference
+        del hub_before_rawlink
+
         try:
-            self._switch_to_hub(self.hub)
+            self._switch_to_hub(self.hub if not self._enable_hub_bug else None)
             # If we got here, we were automatically unlinked already.
             resume_this_greenlet = None
         finally:
@@ -448,6 +468,11 @@ class AbstractLinkable(object):
     def _switch_to_hub(self, the_hub):
         self._drop_lock_for_switch_out()
         try:
+            if the_hub is None:
+                print('AbstractLinkable._switch_to_hub: the hub is None; '
+                      'this should not happen here (bug); attempting to get new hub...',
+                      file=sys.stderr)
+                the_hub = self._capture_hub(True)
             result = the_hub.switch()
         finally:
             self._acquire_lock_for_switch_in()

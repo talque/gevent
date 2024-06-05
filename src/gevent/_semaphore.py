@@ -14,6 +14,7 @@ __all__ = [
     'BoundedSemaphore',
 ]
 
+import sys
 from time import sleep as _native_sleep
 
 from gevent._compat import monotonic
@@ -209,6 +210,8 @@ class Semaphore(AbstractLinkable): # pylint:disable=undefined-variable
             self._multithreaded = self._get_thread_ident()
         elif self._multithreaded != self._get_thread_ident():
             self._multithreaded = _MULTI
+            print('Semaphore used across multiple threads; this is technically '
+                  'allowed but could be buggy', file=sys.stderr)
 
         # We conceptually now belong to the hub of the thread that
         # called this, whether or not we have to block. Note that we

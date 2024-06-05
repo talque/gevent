@@ -8,6 +8,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
 
 import _thread
 
@@ -138,6 +139,8 @@ def get_hub_if_exists():
 
 
 def set_hub(hub):
+    if hub is None:
+        print('set_hub(None)', file=sys.stderr)
     _threadlocal.hub = hub
 
 def get_loop():

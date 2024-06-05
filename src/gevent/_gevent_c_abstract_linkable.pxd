@@ -50,6 +50,7 @@ cdef class AbstractLinkable(object):
    cdef _notifier
    cdef list _links
    cdef bint _notify_all
+   cdef bint _enable_hub_bug
 
    cpdef linkcount(self)
    cpdef rawlink(self, callback)
