@@ -59,9 +59,16 @@ class GreenletTracer(object):
         if event in ('switch', 'throw'):
             # args is (origin, target). This is the only defined
             # case
-            self.active_greenlet = args[1]
+            active_greenlet = args[1]
         else:
-            self.active_greenlet = None
+            active_greenlet = None
+
+        if getattr(active_greenlet, 'gevent_monitoring_thread', None) is not None:
+            # Don't trace other monitor threads
+            active_greenlet = None
+
+        self.active_greenlet = active_greenlet
+
         if self.previous_trace_function is not None:
             self.previous_trace_function(event, args)
 
